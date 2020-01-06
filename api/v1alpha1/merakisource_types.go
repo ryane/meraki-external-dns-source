@@ -16,28 +16,46 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// MerakiRef is a reference to a Meraki resource
+type MerakiRef struct {
+	Name string `json:"name,omitempty"`
+	ID   string `json:"id,omitempty"`
+}
 
 // MerakiSourceSpec defines the desired state of MerakiSource
 type MerakiSourceSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Organization is a reference to the organization to query (name or id)
+	Organization MerakiRef `json:"organization,omitempty"`
 
-	// Foo is an example field of MerakiSource. Edit MerakiSource_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Network is a reference to the network to query (name or id)
+	Network MerakiRef `json:"network,omitempty"`
+
+	// Domain is the DNS suffix to use for the client DNS registration
+	Domain string `json:"domain,omitempty"`
+
+	// +kubebuilder:validation:Minimum=0
+
+	// TTL requests the TTL of the record for the client. The actual TTL that is
+	// used will depend on the provider
+	// https://github.com/kubernetes-sigs/external-dns/blob/master/docs/ttl.md
+	TTL *int64 `json:"ttl,omitempty"`
 }
 
 // MerakiSourceStatus defines the observed state of MerakiSource
 type MerakiSourceStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Endpoint is a pointer to the managed DNSEndpoint
+	// +optional
+	Endpoint []corev1.ObjectReference `json:"endpoint,omitempty"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // MerakiSource is the Schema for the merakisources API
 type MerakiSource struct {

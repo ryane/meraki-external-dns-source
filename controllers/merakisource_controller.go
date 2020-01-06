@@ -19,6 +19,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,12 +36,29 @@ type MerakiSourceReconciler struct {
 
 // +kubebuilder:rbac:groups=dns.jossware.com,resources=merakisources,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dns.jossware.com,resources=merakisources/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=externaldns.k8s.io,resources=dnsendpoints,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=externaldns.k8s.io,resources=dnsendpoints/status,verbs=get
 
 func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("merakisource", req.NamespacedName)
+	ctx := context.Background()
+	log := r.Log.WithValues("merakisource", req.NamespacedName)
 
-	// your logic here
+	var source dnsv1alpha1.MerakiSource
+	if err := r.Get(ctx, req.NamespacedName, &source); err != nil {
+		if apierrs.IsNotFound(err) {
+			// 404, wait for next notification
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "unable to fetch MerakiSource")
+		return ctrl.Result{}, err
+	}
+
+	// 2. query meraki
+
+	// 3. check if owned DNSEndpoint exists
+
+	// 4. if not, create it
+	// 5. if so, update the spec
 
 	return ctrl.Result{}, nil
 }
