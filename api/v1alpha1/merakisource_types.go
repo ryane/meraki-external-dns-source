@@ -18,6 +18,14 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
+var (
+	DNSEndpointGroupVersion = schema.GroupVersion{
+		Group:   "externaldns.k8s.io",
+		Version: "v1alpha1",
+	}
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -49,9 +57,9 @@ type MerakiSourceSpec struct {
 
 // MerakiSourceStatus defines the observed state of MerakiSource
 type MerakiSourceStatus struct {
-	// Endpoint is a pointer to the managed DNSEndpoint
+	// Endpoints are pointers to the managed DNSEndpoints
 	// +optional
-	Endpoint []corev1.ObjectReference `json:"endpoint,omitempty"`
+	Endpoints []corev1.ObjectReference `json:"endpoint,omitempty"`
 }
 
 // +kubebuilder:object:root=true

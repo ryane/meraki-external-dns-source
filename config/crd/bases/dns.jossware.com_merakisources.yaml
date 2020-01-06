@@ -68,7 +68,7 @@ spec:
           description: MerakiSourceStatus defines the observed state of MerakiSource
           properties:
             endpoint:
-              description: Endpoint is a pointer to the managed DNSEndpoint
+              description: Endpoints are pointers to the managed DNSEndpoints
               items:
                 description: ObjectReference contains enough information to let you
                   inspect or modify the referred object.

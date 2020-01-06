@@ -19,8 +19,10 @@ import (
 	"flag"
 	"os"
 
+	"github.com/kubernetes-incubator/external-dns/endpoint"
 	dnsv1alpha1 "github.com/ryane/meraki-external-dns-source/api/v1alpha1"
 	"github.com/ryane/meraki-external-dns-source/controllers"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -39,6 +41,14 @@ func init() {
 
 	_ = dnsv1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
+
+	// register DNSEndpoint from external-dns
+	metav1.AddToGroupVersion(scheme, dnsv1alpha1.DNSEndpointGroupVersion)
+	scheme.AddKnownTypes(
+		dnsv1alpha1.DNSEndpointGroupVersion,
+		&endpoint.DNSEndpoint{},
+		&endpoint.DNSEndpointList{},
+	)
 }
 
 func main() {
