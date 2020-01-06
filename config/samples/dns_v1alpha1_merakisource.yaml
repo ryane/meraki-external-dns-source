@@ -1,0 +1,7 @@
+apiVersion: dns.jossware.com/v1alpha1
+kind: MerakiSource
+metadata:
+  name: merakisource-sample
+spec:
+  # Add fields here
+  foo: bar

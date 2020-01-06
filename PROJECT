@@ -1,3 +1,7 @@
 domain: jossware.com
 repo: github.com/ryane/meraki-external-dns-source
+resources:
+- group: dns
+  kind: MerakiSource
+  version: v1alpha1
 version: "2"
