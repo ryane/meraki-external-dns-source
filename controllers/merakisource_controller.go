@@ -20,7 +20,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kubernetes-incubator/external-dns/endpoint"
-	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,6 +50,7 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err := r.Get(ctx, req.NamespacedName, &source); err != nil {
 		if apierrs.IsNotFound(err) {
 			// 404, wait for next notification
+			log.V(1).Info("not found")
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "unable to fetch MerakiSource")
@@ -59,41 +59,43 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// query meraki
 
-	// check if owned DNSEndpoints exist
-	var dnsEndpointList endpoint.DNSEndpointList
-	if err := r.List(ctx, &dnsEndpointList, client.InNamespace(req.Namespace), client.MatchingFields{jobOwnerKey: req.Name}); err != nil {
-		return ctrl.Result{}, nil
+	var dnsEndpoint endpoint.DNSEndpoint
+	// dns endpoint will have the same name as the MerakiSource
+	if err := r.Get(ctx, req.NamespacedName, &dnsEndpoint); err != nil {
+		if apierrs.IsNotFound(err) {
+			log.V(1).Info("dns endpoint not found")
+			// create it
+			e := &endpoint.DNSEndpoint{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      source.Name,
+					Namespace: source.Namespace,
+				},
+			}
+			if err := ctrl.SetControllerReference(&source, e, r.Scheme); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := r.Create(ctx, e); err != nil {
+				log.Error(err, "unable to create dns endpoint", "dns-endpoint", e)
+				return ctrl.Result{}, err
+			}
+			log.V(1).Info("created dns endpoint")
+			return ctrl.Result{Requeue: true}, nil
+		}
+		log.Error(err, "unable to get dns endpoint", "dns-endpoint", req.NamespacedName)
+		return ctrl.Result{}, err
 	}
-	log.V(1).Info("endpoints", "count", len(dnsEndpointList.Items))
 
-	if len(dnsEndpointList.Items) == 0 {
-		// if not, create one and requeue
-		e := &endpoint.DNSEndpoint{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      source.Name,
-				Namespace: source.Namespace,
-			},
-		}
-		if err := ctrl.SetControllerReference(&source, e, r.Scheme); err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := r.Create(ctx, e); err != nil {
-			log.Error(err, "unable to create dns endpoint", "dnsEndpoint", e)
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, nil
+	ref, err := ref.GetReference(r.Scheme, &dnsEndpoint)
+	if err != nil {
+		log.Error(err, "unable to make reference to dns endpoint", "dns-endpoint", dnsEndpoint)
+		return ctrl.Result{}, err
 	}
-
-	source.Status.Endpoints = []corev1.ObjectReference{}
-	for _, e := range dnsEndpointList.Items {
-		ref, err := ref.GetReference(r.Scheme, &e)
-		if err != nil {
-			log.Error(err, "unable to make reference to dns endpoint", "dnsEndpoint", e)
-			continue
-		}
-		source.Status.Endpoints = append(source.Status.Endpoints, *ref)
-	}
+	source.Status.Endpoint = *ref
 	if err := r.Status().Update(ctx, &source); err != nil {
+		if apierrs.IsConflict(err) {
+			log.V(1).Info("stale MerakiSource, requeue")
+			return ctrl.Result{Requeue: true}, nil
+		}
 		log.Error(err, "unable to update MerakiSource status")
 		return ctrl.Result{}, err
 	}
@@ -103,27 +105,7 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	return ctrl.Result{}, nil
 }
 
-var (
-	jobOwnerKey = ".metadata.controller"
-)
-
 func (r *MerakiSourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(&endpoint.DNSEndpoint{}, jobOwnerKey, func(rawObj runtime.Object) []string {
-		r.Log.V(1).Info("index field", "jobOwnerKey", jobOwnerKey, "rawObj", rawObj)
-		e := rawObj.(*endpoint.DNSEndpoint)
-		owner := metav1.GetControllerOf(e)
-		r.Log.V(1).Info("index field", "endpoint", e.Name, "owner", owner)
-		if owner == nil {
-			return nil
-		}
-		if owner.APIVersion != dnsv1alpha1.GroupVersion.String() || owner.Kind != "MerakiSource" {
-			return nil
-		}
-		return []string{owner.Name}
-	}); err != nil {
-		return err
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dnsv1alpha1.MerakiSource{}).
 		Owns(&endpoint.DNSEndpoint{}).

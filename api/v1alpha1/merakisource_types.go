@@ -57,9 +57,9 @@ type MerakiSourceSpec struct {
 
 // MerakiSourceStatus defines the observed state of MerakiSource
 type MerakiSourceStatus struct {
-	// Endpoints are pointers to the managed DNSEndpoints
+	// Endpoint is a pointer to the managed DNSEndpoint
 	// +optional
-	Endpoints []corev1.ObjectReference `json:"endpoint,omitempty"`
+	Endpoint corev1.ObjectReference `json:"endpoint,omitempty"`
 }
 
 // +kubebuilder:object:root=true
