@@ -17,6 +17,8 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -35,8 +37,11 @@ import (
 // MerakiSourceReconciler reconciles a MerakiSource object
 type MerakiSourceReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log                logr.Logger
+	Scheme             *runtime.Scheme
+	APIKey             string
+	APIThrottleInteral time.Duration
+	RequeueInterval    time.Duration
 }
 
 // +kubebuilder:rbac:groups=dns.jossware.com,resources=merakisources,verbs=get;list;watch;create;update;patch;delete
@@ -84,8 +89,7 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// update the spec from MerakiData
 	// don't query meraki if we already did in the last 1 minute
-	// TODO: configurable?
-	if source.Status.SyncedAt == nil || time.Now().Sub(source.Status.SyncedAt.Time) > 1*time.Minute {
+	if source.Status.SyncedAt == nil || time.Now().Sub(source.Status.SyncedAt.Time) > r.APIThrottleInteral {
 		endpoints, err := r.GetEndpoints(&source)
 		if err != nil {
 			log.Error(err, "failed to get endpoints")
@@ -127,22 +131,54 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	return ctrl.Result{RequeueAfter: r.RequeueInterval}, nil
 }
 
 func (r *MerakiSourceReconciler) GetEndpoints(source *dnsv1alpha1.MerakiSource) ([]*endpoint.Endpoint, error) {
-	// TODO: configurable api key
-	merakiClient := meraki.New("")
+	merakiClient := meraki.New(r.APIKey)
 
-	if source.Spec.Organization.ID == "" {
-		// look up organization
+	networkID := source.Spec.Network.ID
+	if networkID == "" {
+		networkName := source.Spec.Network.Name
+		if networkName == "" {
+			return nil, errors.New("network name or ID is required")
+		}
+
+		// make sure we have the organization ID
+		orgID := source.Spec.Organization.ID
+		if orgID == "" {
+			orgName := source.Spec.Organization.Name
+			if orgName == "" {
+				return nil, errors.New("organization name or ID is required")
+			}
+
+			// look up organization
+			org, err := merakiClient.FindOrganization(orgName)
+			if err != nil {
+				return nil, err
+			}
+
+			if org == nil {
+				return nil, fmt.Errorf("%s organization not found. check your name or API key", orgName)
+			}
+
+			orgID = org.ID
+		}
+
+		// lookup network
+		network, err := merakiClient.FindNetwork(orgID, networkName)
+		if err != nil {
+			return nil, err
+		}
+
+		if network == nil {
+			return nil, fmt.Errorf("%s network not found. check your name, organization, or API key", networkName)
+		}
+
+		networkID = network.ID
 	}
 
-	if source.Spec.Network.ID == "" {
-		// look up network
-	}
-
-	clients, err := merakiClient.Clients(source.Spec.Network.ID)
+	clients, err := merakiClient.Clients(networkID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +189,7 @@ func (r *MerakiSourceReconciler) GetEndpoints(source *dnsv1alpha1.MerakiSource) 
 		if source.Spec.TTL != nil {
 			e.RecordTTL = endpoint.TTL(*source.Spec.TTL)
 		}
-		r.Log.V(1).Info("created endpoint", "endpoint", e)
+		r.Log.V(1).Info("found endpoint", "endpoint", e)
 		endpoints = append(endpoints, e)
 	}
 
