@@ -17,9 +17,11 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/kubernetes-incubator/external-dns/endpoint"
+	"github.com/ryane/meraki-external-dns-source/pkg/meraki"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,8 +59,6 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
-	// query meraki
-
 	var dnsEndpoint endpoint.DNSEndpoint
 	// dns endpoint will have the same name as the MerakiSource
 	if err := r.Get(ctx, req.NamespacedName, &dnsEndpoint); err != nil {
@@ -85,6 +85,19 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
+	// update the spec from MerakiData
+	endpoints, err := r.GetEndpoints(&source)
+	if err != nil {
+		log.Error(err, "failed to get endpoints")
+		return ctrl.Result{}, err
+	}
+
+	dnsEndpoint.Spec.Endpoints = endpoints
+	if err := r.Update(ctx, &dnsEndpoint); err != nil {
+		log.Error(err, "failed to update dns endpoint", "dns-endpoint", dnsEndpoint)
+		return ctrl.Result{}, err
+	}
+
 	ref, err := ref.GetReference(r.Scheme, &dnsEndpoint)
 	if err != nil {
 		log.Error(err, "unable to make reference to dns endpoint", "dns-endpoint", dnsEndpoint)
@@ -100,9 +113,37 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
-	// update the spec from MerakiData
+	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+}
 
-	return ctrl.Result{}, nil
+func (r *MerakiSourceReconciler) GetEndpoints(source *dnsv1alpha1.MerakiSource) ([]*endpoint.Endpoint, error) {
+	// TODO: configurable api key
+	merakiClient := meraki.New("")
+
+	if source.Spec.Organization.ID == "" {
+		// look up organization
+	}
+
+	if source.Spec.Network.ID == "" {
+		// look up network
+	}
+
+	clients, err := merakiClient.Clients(source.Spec.Network.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var endpoints []*endpoint.Endpoint
+	for _, client := range clients {
+		e := endpoint.NewEndpoint(client.DNSName()+"."+source.Spec.Domain, "A", client.IP)
+		if source.Spec.TTL != nil {
+			e.RecordTTL = endpoint.TTL(*source.Spec.TTL)
+		}
+		r.Log.V(1).Info("created endpoint", "endpoint", e)
+		endpoints = append(endpoints, e)
+	}
+
+	return endpoints, nil
 }
 
 func (r *MerakiSourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
