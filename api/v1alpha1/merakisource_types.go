@@ -60,6 +60,10 @@ type MerakiSourceStatus struct {
 	// Endpoint is a pointer to the managed DNSEndpoint
 	// +optional
 	Endpoint corev1.ObjectReference `json:"endpoint,omitempty"`
+
+	// SyncedAt is the time the endpoint was last synced from Meraki
+	// +optional
+	SyncedAt *metav1.Time `json:"syncedAt,omitempty"`
 }
 
 // +kubebuilder:object:root=true

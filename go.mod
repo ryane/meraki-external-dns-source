@@ -6,6 +6,7 @@ require (
 	github.com/apex/log v1.1.1
 	github.com/go-logr/logr v0.1.0
 	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef // indirect
+	github.com/google/go-containerregistry v0.0.0-20200104041235-b02f5c5c9053
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/kubernetes-incubator/external-dns v0.5.12
 	github.com/onsi/ginkgo v1.10.1

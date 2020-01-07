@@ -48,6 +48,7 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	ctx := context.Background()
 	log := r.Log.WithValues("merakisource", req.NamespacedName)
 
+	// get meraki source resource
 	var source dnsv1alpha1.MerakiSource
 	if err := r.Get(ctx, req.NamespacedName, &source); err != nil {
 		if apierrs.IsNotFound(err) {
@@ -65,37 +66,50 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		if apierrs.IsNotFound(err) {
 			log.V(1).Info("dns endpoint not found")
 			// create it
-			e := &endpoint.DNSEndpoint{
+			dnsEndpoint = endpoint.DNSEndpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      source.Name,
 					Namespace: source.Namespace,
 				},
 			}
-			if err := ctrl.SetControllerReference(&source, e, r.Scheme); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err := r.Create(ctx, e); err != nil {
-				log.Error(err, "unable to create dns endpoint", "dns-endpoint", e)
-				return ctrl.Result{}, err
-			}
-			log.V(1).Info("created dns endpoint")
-			return ctrl.Result{Requeue: true}, nil
+		} else {
+			log.Error(err, "unable to get dns endpoint", "dns-endpoint", req.NamespacedName)
+			return ctrl.Result{}, err
 		}
-		log.Error(err, "unable to get dns endpoint", "dns-endpoint", req.NamespacedName)
+	}
+
+	if err := ctrl.SetControllerReference(&source, &dnsEndpoint, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// update the spec from MerakiData
-	endpoints, err := r.GetEndpoints(&source)
-	if err != nil {
-		log.Error(err, "failed to get endpoints")
-		return ctrl.Result{}, err
-	}
+	// don't query meraki if we already did in the last 1 minute
+	// TODO: configurable?
+	if source.Status.SyncedAt == nil || time.Now().Sub(source.Status.SyncedAt.Time) > 1*time.Minute {
+		endpoints, err := r.GetEndpoints(&source)
+		if err != nil {
+			log.Error(err, "failed to get endpoints")
+			return ctrl.Result{}, err
+		}
 
-	dnsEndpoint.Spec.Endpoints = endpoints
-	if err := r.Update(ctx, &dnsEndpoint); err != nil {
-		log.Error(err, "failed to update dns endpoint", "dns-endpoint", dnsEndpoint)
-		return ctrl.Result{}, err
+		dnsEndpoint.Spec.Endpoints = endpoints
+
+		if r.isNew(dnsEndpoint) {
+			if err := r.Create(ctx, &dnsEndpoint); err != nil {
+				log.Error(err, "failed to create dns endpoint", "dns-endpoint", dnsEndpoint)
+				return ctrl.Result{}, err
+			}
+			log.V(1).Info("created dns endpoint", "dns-endpoint", dnsEndpoint.GetName())
+		} else {
+			if err := r.Update(ctx, &dnsEndpoint); err != nil {
+				log.Error(err, "failed to update dns endpoint", "dns-endpoint")
+				return ctrl.Result{}, err
+			}
+			log.V(1).Info("updated dns endpoint", "dns-endpoint", dnsEndpoint.GetName())
+		}
+
+		ts := metav1.Now()
+		source.Status.SyncedAt = &ts
 	}
 
 	ref, err := ref.GetReference(r.Scheme, &dnsEndpoint)
@@ -113,7 +127,7 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
 }
 
 func (r *MerakiSourceReconciler) GetEndpoints(source *dnsv1alpha1.MerakiSource) ([]*endpoint.Endpoint, error) {
@@ -144,6 +158,10 @@ func (r *MerakiSourceReconciler) GetEndpoints(source *dnsv1alpha1.MerakiSource) 
 	}
 
 	return endpoints, nil
+}
+
+func (r *MerakiSourceReconciler) isNew(e endpoint.DNSEndpoint) bool {
+	return e.GetCreationTimestamp().Time.IsZero()
 }
 
 func (r *MerakiSourceReconciler) SetupWithManager(mgr ctrl.Manager) error {

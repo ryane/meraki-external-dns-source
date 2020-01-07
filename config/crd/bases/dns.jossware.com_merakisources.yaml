@@ -103,6 +103,11 @@ spec:
                   description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                   type: string
               type: object
+            syncedAt:
+              description: SyncedAt is the time the endpoint was last synced from
+                Meraki
+              format: date-time
+              type: string
           type: object
       type: object
   version: v1alpha1
