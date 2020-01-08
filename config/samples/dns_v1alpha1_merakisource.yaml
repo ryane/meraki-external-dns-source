@@ -1,7 +1,16 @@
+---
 apiVersion: dns.jossware.com/v1alpha1
 kind: MerakiSource
 metadata:
-  name: merakisource-sample
+  name: office
 spec:
-  # Add fields here
-  foo: bar
+  organization:
+    name: orgname
+    # or
+    # id: "883774"
+  network:
+    name: netname
+    # or
+    # id: N_718763889465382178
+  domain: office.example.com
+  ttl: 60

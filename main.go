@@ -18,6 +18,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"io/ioutil"
 	"os"
 	"time"
 
@@ -59,20 +60,37 @@ func main() {
 	var throttleInterval time.Duration
 	var requeueInterval time.Duration
 	var apiKey string
+	var apiKeyFile string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.DurationVar(&throttleInterval, "throttle-interval", 1*time.Minute, "Attempt to restrict Meraki API calls to only occur once within this interval. There are conditions where this does not apply.")
 	flag.DurationVar(&requeueInterval, "requeue-interval", 5*time.Minute, "How long to wait before requeueing Meraki Sources.")
 	flag.StringVar(&apiKey, "api-key", "", "The API key for the Meraki API.")
+	flag.StringVar(&apiKeyFile, "api-key-file", "", "Reads the API key from this file.")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(func(o *zap.Options) {
 		o.Development = true
 	}))
 
-	if val, ok := os.LookupEnv("MERAKI_API_KEY"); ok {
-		apiKey = val
+	if apiKey == "" {
+		// it was not passed in as an arg, let's try reading it from a file
+		if apiKeyFile != "" {
+			buf, err := ioutil.ReadFile(apiKeyFile)
+			if err != nil {
+				setupLog.Error(err, "unable to read api key from file")
+				os.Exit(1)
+			}
+			apiKey = string(buf)
+		}
+	}
+
+	if apiKey == "" {
+		// still not provided, let's see if it is in the environment
+		if val, ok := os.LookupEnv("MERAKI_API_KEY"); ok {
+			apiKey = val
+		}
 	}
 
 	if apiKey == "" {

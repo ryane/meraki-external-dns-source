@@ -3,11 +3,10 @@ module github.com/ryane/meraki-external-dns-source
 go 1.13
 
 require (
-	github.com/apex/log v1.1.1
 	github.com/go-logr/logr v0.1.0
 	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef // indirect
-	github.com/google/go-containerregistry v0.0.0-20200104041235-b02f5c5c9053
 	github.com/imdario/mergo v0.3.7 // indirect
+	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kubernetes-incubator/external-dns v0.5.12
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0
@@ -15,6 +14,7 @@ require (
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90 // indirect
 	github.com/prometheus/procfs v0.0.0-20190403104016-ea9eea638872 // indirect
 	github.com/sirupsen/logrus v1.4.2
+	golang.org/x/sys v0.0.0-20191010194322-b09406accb47 // indirect
 
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0
