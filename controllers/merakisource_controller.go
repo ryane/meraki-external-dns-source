@@ -178,7 +178,7 @@ func (r *MerakiSourceReconciler) GetEndpoints(source *dnsv1alpha1.MerakiSource) 
 		networkID = network.ID
 	}
 
-	clients, err := merakiClient.Clients(networkID)
+	clients, err := merakiClient.OnlineClients(networkID)
 	if err != nil {
 		return nil, err
 	}
