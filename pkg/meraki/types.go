@@ -50,7 +50,9 @@ type Client struct {
 func (c *Client) DNSName() string {
 	name := strings.ToLower(c.Description)
 	if name == "" {
-		name = strings.Replace(strings.ToLower(c.Mac), ":", "-", -1)
+		name = strings.ToLower(c.Mac)
 	}
+	name = strings.Replace(name, " ", "-", -1)
+	name = strings.Replace(name, ":", "-", -1)
 	return name
 }
