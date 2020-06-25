@@ -78,3 +78,7 @@ CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+external-dns:
+	helm repo add bitnami https://charts.bitnami.com/bitnami
+	helm template external-dns bitnami/external-dns --set crd.create=true | kfilt -k CustomResourceDefinition | kubectl apply -f -

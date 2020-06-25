@@ -37,11 +37,11 @@ import (
 // MerakiSourceReconciler reconciles a MerakiSource object
 type MerakiSourceReconciler struct {
 	client.Client
-	Log                logr.Logger
-	Scheme             *runtime.Scheme
-	APIKey             string
-	APIThrottleInteral time.Duration
-	RequeueInterval    time.Duration
+	Log                 logr.Logger
+	Scheme              *runtime.Scheme
+	APIKey              string
+	APIThrottleInterval time.Duration
+	RequeueInterval     time.Duration
 }
 
 // +kubebuilder:rbac:groups=dns.jossware.com,resources=merakisources,verbs=get;list;watch;create;update;patch;delete
@@ -89,7 +89,7 @@ func (r *MerakiSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// update the spec from MerakiData
 	// don't query meraki if we already did in the last 1 minute
-	if source.Status.SyncedAt == nil || time.Now().Sub(source.Status.SyncedAt.Time) > r.APIThrottleInteral {
+	if source.Status.SyncedAt == nil || time.Since(source.Status.SyncedAt.Time) > r.APIThrottleInterval {
 		endpoints, err := r.GetEndpoints(&source)
 		if err != nil {
 			log.Error(err, "failed to get endpoints")

@@ -110,12 +110,12 @@ func main() {
 	}
 
 	if err = (&controllers.MerakiSourceReconciler{
-		Client:             mgr.GetClient(),
-		Log:                ctrl.Log.WithName("controllers").WithName("MerakiSource"),
-		Scheme:             mgr.GetScheme(),
-		APIKey:             "bf64076d521240fe38175969fbc8b46c6e0af625",
-		APIThrottleInteral: throttleInterval,
-		RequeueInterval:    requeueInterval,
+		Client:              mgr.GetClient(),
+		Log:                 ctrl.Log.WithName("controllers").WithName("MerakiSource"),
+		Scheme:              mgr.GetScheme(),
+		APIKey:              apiKey,
+		APIThrottleInterval: throttleInterval,
+		RequeueInterval:     requeueInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MerakiSource")
 		os.Exit(1)
