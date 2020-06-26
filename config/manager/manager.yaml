@@ -27,7 +27,11 @@ spec:
         - /manager
         args:
         - --enable-leader-election
-        image: controller:latest
+        env:
+        - name: MERAKI_API_KEY
+          value: <apikey>
+        image: ryane/meraki-external-dns-source:latest
+        imagePullPolicy: Always
         name: manager
         resources:
           limits:
